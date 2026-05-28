@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Çalma Listesi MP3 İndirici</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-red-600 p-2 rounded-lg text-white animate-pulse">
+                    <i class="fa-solid fa-play-css fa-headphones-simple text-xl"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent">ListToMP3</span>
+            </div>
+            <a href="https://github.com" target="_blank" class="text-slate-400 hover:text-white transition">
+                <i class="fa-brands fa-github text-2xl"></i>
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-3xl w-full mx-auto px-4 py-12 flex-grow flex flex-col justify-center">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold mb-3 tracking-tight">Çalma Listesini <span class="text-red-500">MP3</span>'e Dönüştür</h1>
+            <p class="text-slate-400 text-lg">YouTube çalma listesi linkini yapıştırın, tek tıkla tüm müzikleri indirin.</p>
+        </div>
+
+        <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl shadow-xl backdrop-blur-sm mb-8">
+            <div class="flex flex-col md:flex-row gap-3">
+                <div class="relative flex-grow">
+                    <i class="fa-solid fa-link absolute left-4 top-4.5 text-slate-500"></i>
+                    <input type="text" id="playlistUrl" placeholder="https://www.youtube.com/playlist?list=..." 
+                           class="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all">
+                </div>
+                <button id="downloadBtn" onclick="processPlaylist()" class="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-orange-500 text-white font-semibold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                    <i class="fa-solid fa-download"></i> MP3 İndir
+                </button>
+            </div>
+            <p id="errorMessage" class="text-red-400 text-sm mt-3 hidden flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation"></i> Lütfen geçerli bir YouTube çalma listesi linki girin!
+            </p>
+        </div>
+
+        <div id="statusCard" class="bg-slate-800/30 border border-slate-700/40 rounded-2xl p-6 hidden animate-fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold text-lg text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-red-500"></i> Çalma Listesi İçeriği
+                </h3>
+                <span id="globalProgress" class="text-sm bg-slate-700 px-3 py-1 rounded-full text-slate-300 font-mono">0 / 0</span>
+            </div>
+
+            <div class="w-full bg-slate-700 h-2 rounded-full mb-6 overflow-hidden">
+                <div id="progressBar" class="bg-gradient-to-r from-red-500 to-emerald-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+
+            <div id="songList" class="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6 bg-slate-950/40">
+        <div class="max-w-5xl mx-auto px-4 text-center text-sm text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>&copy; 2026 ListToMP3. Tüm hakları saklıdır.</p>
+            <p class="font-semibold tracking-wider text-slate-400 uppercase text-xs">powered by ÖZGÜR DAĞ</p>
+        </div>
+    </footer>
+
+    <script>
+        // Örnek / Simüle veri çekeceğimiz ve dönüştürme yapacağımız API entegrasyonu mantığı
+        async function processPlaylist() {
+            const urlInput = document.getElementById('playlistUrl').value.trim();
+            const errorMsg = document.getElementById('errorMessage');
+            const statusCard = document.getElementById('statusCard');
+            const songList = document.getElementById('songList');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            // Temel YouTube Çalma Listesi Regex Kontrolü
+            const playlistRegex = /[&?]list=([^&]+)/;
+            if (!playlistRegex.test(urlInput) && !urlInput.includes('list=')) {
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            errorMsg.classList.add('hidden');
+
+            // Butonu yükleniyor durumuna getir
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Listeniz Çözümleniyor...`;
+            
+            // Simüle Edilen Çalma Listesi Verisi (Gerçek senaryoda yt-dlp tabanlı API'ye istek atılır)
+            // GitHub Pages cors politikasından ötürü sunucusuz mimaride üçüncü taraf dönüşüm API'si kullanılır.
+            setTimeout(() => {
+                statusCard.classList.remove('hidden');
+                songList.innerHTML = '';
+                
+                const mockTracks = [
+                    { id: 1, title: "Indila - Dernière Danse", duration: "3:34" },
+                    { id: 2, title: "Eminem - Lose Yourself", duration: "5:26" },
+                    { id: 3, title: "Manga - Bir Kadın Çizeceksin", duration: "4:02" },
+                    { id: 4, title: "The Weeknd - Blinding Lights", duration: "3:21" }
+                ];
+
+                const totalTracks = mockTracks.length;
+                document.getElementById('globalProgress').innerText = `0 / ${totalTracks}`;
+                
+                mockTracks.forEach((track, index) => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between bg-slate-900/60 border border-slate-700/40 p-3.5 rounded-xl hover:border-slate-600 transition";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="text-slate-500 font-mono text-sm w-5">${index + 1}</span>
+                            <div class="truncate">
+                                <p class="font-medium text-sm text-slate-200 truncate">${track.title}</p>
+                                <p class="text-xs text-slate-500">${track.duration}</p>
+                            </div>
+                        </div>
+                        <div id="status-${track.id}" class="text-sm font-medium text-amber-400 flex items-center gap-2 shrink-0">
+                            <i class="fa-solid fa-clock animate-pulse"></i> Sırada
+                        </div>
+                    `;
+                    songList.appendChild(row);
+                });
+
+                // Sırayla indirme simülasyonu / API tetikleme döngüsü
+                downloadSequentially(mockTracks, 0);
+
+                // Butonu eski haline getir
+                downloadBtn.disabled = false;
+                downloadBtn.innerHTML = `<i class="fa-solid fa-download"></i> MP3 İndir`;
+            }, 1500);
+        }
+
+        async function downloadSequentially(tracks, index) {
+            if (index >= tracks.length) return;
+
+            const track = tracks[index];
+            const statusDiv = document.getElementById(`status-${track.id}`);
+            
+            // Durumu "Dönüştürülüyor" yap
+            statusDiv.className = "text-sm font-medium text-blue-400 flex items-center gap-2 shrink-0";
+            statusDiv.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> İndiriliyor`;
+
+            // Dönüştürme/İndirme API Bekleme Süresi (Gerçek API çağrısı fetch ile buraya gelir)
+            await new Promise(resolve => setTimeout(resolve, 2500));
+
+            // Tamamlandı Durumu
+            statusDiv.className = "text-sm font-medium text-emerald-400 flex items-center gap-2 shrink-0";
+            statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> Tamamlandı`;
+
+            // Dosyayı tetikle (Gerçek API'den gelen blob dosya indirme tetikleyicisi)
+            triggerFakeDownload(track.title);
+
+            // Arayüz İlerleme Çubuğunu Güncelle
+            const completed = index + 1;
+            document.getElementById('globalProgress').innerText = `${completed} / ${tracks.length}`;
+            const percent = (completed / tracks.length) * 100;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+
+            // Bir sonraki şarkıya geç
+            downloadSequentially(tracks, index + 1);
+        }
+
+        function triggerFakeDownload(title) {
+            // Gerçek API entegrasyonunda tarayıcıya indirme komutu veren blok
+            console.log(`${title}.mp3 başarıyla cihaza indirildi.`);
+        }
+    </script>
+
+    <style>
+        /* Özelleştirilmiş Scrollbar Tasarımı */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</body>
+</html>
