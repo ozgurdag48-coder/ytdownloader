@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF'ten Online & Word Test Oluşturucu</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
@@ -60,4 +60,239 @@
     </div>
 
     <script>
-        // PDF.js worker ayarı - GitHub uyumlu kararlı CDN
+        // PDF.js worker ayarı - GitHub Pages için en kararlı CDN bağlantısı (cdnjs)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let extractedText = "";
+        let currentQuestions = [];
+
+        // 1. PDF'ten Metin Okuma
+        document.getElementById('pdfFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Önceki test verilerini temizle ve butonu gizle
+            extractedText = "";
+            currentQuestions = [];
+            document.getElementById('generateBtn').classList.add('hidden');
+            document.getElementById('testArea').classList.add('hidden');
+
+            const fileReader = new FileReader();
+            
+            fileReader.onload = async function() {
+                try {
+                    const typedarray = new Uint8Array(this.result);
+                    // PDF yükleme isteği
+                    const loadingTask = pdfjsLib.getDocument(typedarray);
+                    const pdf = await loadingTask.promise;
+                    
+                    const maxPages = Math.min(pdf.numPages, 5); // API limitleri için ilk 5 sayfa
+                    let fullText = "";
+
+                    for (let i = 1; i <= maxPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(" ");
+                        fullText += pageText + " ";
+                    }
+                    
+                    extractedText = fullText.trim();
+
+                    if(extractedText.length > 100) { // En az 100 karakter metin olmalı
+                        document.getElementById('generateBtn').classList.remove('hidden');
+                        alert("PDF başarıyla okundu (" + fullText.length + " karakter). Artık test oluşturabilirsiniz.");
+                    } else {
+                        alert("PDF okunabildi ancak yeterli metin bulunamadı. Lütfen dijital bir PDF deneyin (taranmış resim PDF'leri çalışmaz).");
+                    }
+                } catch (err) {
+                    console.error("PDF Okuma Hatası:", err);
+                    alert("PDF okunurken bir hata oluştu. Tarayıcı konsolunu (F12) kontrol edin.\nHata: " + err.message);
+                }
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+
+        // 2. Gemini API ile Test Üretme
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert("Lütfen önce Gemini API anahtarınızı girin!");
+                return;
+            }
+
+            if (!extractedText || extractedText.length < 100) {
+                alert("PDF metni eksik veya çok kısa. Lütfen PDF'i tekrar yükleyin.");
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('testArea').classList.add('hidden');
+            document.getElementById('resultBox').classList.add('hidden');
+
+            const prompt = `Aşağıdaki metne dayanarak 5 şıklı (A, B, C, D, E) çoktan seçmeli 5 adet benzersiz test sorusu hazırla.
+Çıktıyı kesinlikle sadece ve sadece aşağıdaki JSON formatında ver, başka hiçbir açıklama veya markdown işareti yazma:
+[
+  {
+    "soru": "Soru metni buraya",
+    "siklar": {"A": "Şık 1", "B": "Şık 2", "C": "Şık 3", "D": "Şık 4", "E": "Şık 5"},
+    "cevap": "Doğru Şık (Sadece A, B, C, D veya E)"
+  }
+]
+
+Metin: ${extractedText.substring(0, 4000)}`;
+            
+            try {
+                // API SÜRÜMÜ v1 OLARAK GÜNCELLENDİ (PREVIOUS ERROR FIX)
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            responseMimeType: "application/json"
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || "API Hatası");
+                }
+
+                const data = await response.json();
+                let rawText = data.candidates[0].content.parts[0].text;
+                
+                // Olası markdown kalıntılarını temizleme
+                rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                currentQuestions = JSON.parse(rawText);
+
+                if(currentQuestions && currentQuestions.length > 0) {
+                    renderTest(currentQuestions);
+                } else {
+                    throw new Error("Yapay zeka soru üretemedi.");
+                }
+            } catch (error) {
+                console.error("API veya JSON Hatası:", error);
+                alert("Hata Oluştu: " + error.message + "\n\nLütfen API anahtarınızı kontrol edin veya tekrar deneyin.");
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        });
+
+        // 3. Soruları Ekrana Basma (Online Test)
+        function renderTest(questions) {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = "";
+
+            questions.forEach((q, qIdx) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = "p-4 border border-gray-200 rounded-xl space-y-2 bg-gray-50 transition-colors";
+                
+                const qTitle = document.createElement('h3');
+                qTitle.className = "font-semibold text-gray-900";
+                qTitle.innerText = `${qIdx + 1}. ${q.soru}`;
+                qDiv.appendChild(qTitle);
+
+                Object.entries(q.siklar).forEach(([key, val]) => {
+                    const label = document.createElement('label');
+                    label.className = "flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-200 cursor-pointer text-sm text-gray-700";
+                    
+                    const radio = document.createElement('input');
+                    radio.type = "radio";
+                    radio.name = `question_${qIdx}`;
+                    radio.value = key;
+                    radio.className = "h-4 w-4 text-blue-600 focus:ring-blue-500";
+                    
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(` ${key}) ${val}`));
+                    qDiv.appendChild(label);
+                });
+
+                container.appendChild(qDiv);
+            });
+
+            document.getElementById('testArea').classList.remove('hidden');
+            document.getElementById('submitBtn').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 4. Testi Bitir ve Değerlendir
+        document.getElementById('submitBtn').addEventListener('click', () => {
+            let correctCount = 0;
+            const container = document.getElementById('questionsContainer');
+            
+            currentQuestions.forEach((q, qIdx) => {
+                const selected = document.querySelector(`input[name="question_${qIdx}"]:checked`);
+                const qDiv = container.children[qIdx];
+                
+                // Eski renklendirmeleri temizle
+                qDiv.classList.remove('border-green-500', 'bg-green-50', 'border-red-500', 'bg-red-50', 'bg-green-50/50', 'bg-red-50/50');
+
+                if (selected && selected.value === q.cevap) {
+                    correctCount++;
+                    qDiv.classList.add('border-green-500', 'bg-green-50/50');
+                } else {
+                    qDiv.classList.add('border-red-500', 'bg-red-50/50');
+                }
+            });
+
+            const resultBox = document.getElementById('resultBox');
+            resultBox.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-yellow-100', 'text-yellow-800');
+            
+            resultBox.innerText = `Toplam Başarı: ${correctCount} / ${currentQuestions.length}`;
+            if(correctCount === currentQuestions.length) {
+                resultBox.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                resultBox.classList.add('bg-yellow-100', 'text-yellow-800');
+            }
+            resultBox.scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // 5. Word (DOCX) Dosyası Olarak Kaydetme
+        document.getElementById('downloadWordBtn').addEventListener('click', () => {
+            if (currentQuestions.length === 0) return;
+
+            const docParagraphs = [
+                new docx.Paragraph({
+                    text: "PDF Kaynaklı Çoktan Seçmeli Test",
+                    heading: docx.HeadingLevel.HEADING_1,
+                    spacing: { after: 300 }
+                })
+            ];
+
+            currentQuestions.forEach((q, idx) => {
+                docParagraphs.push(new docx.Paragraph({
+                    text: `${idx + 1}) ${q.soru}`,
+                    bold: true,
+                    spacing: { before: 200, after: 100 }
+                }));
+
+                Object.entries(q.siklar).forEach(([key, val]) => {
+                    docParagraphs.push(new docx.Paragraph({
+                        text: `${key}) ${val}`,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }));
+                });
+            });
+
+            docParagraphs.push(new docx.Paragraph({ text: "", pageBreakBefore: true }));
+            docParagraphs.push(new docx.Paragraph({
+                text: "Cevap Anahtarı",
+                heading: docx.HeadingLevel.HEADING_2,
+                spacing: { after: 200 }
+            }));
+
+            const cevaplarText = currentQuestions.map((q, idx) => `Soru ${idx + 1}: ${q.cevap}`).join(", ");
+            docParagraphs.push(new docx.Paragraph({ text: cevaplarText }));
+
+            const doc = new docx.Document({
+                sections: [{ properties: {}, children: docParagraphs }]
+            });
+
+            docx.Packer.toBlob(doc).then(blob => {
+                saveAs(blob, "pdf_test_sorulari.docx");
+            });
+        });
+    </script>
+</body>
+</html>
