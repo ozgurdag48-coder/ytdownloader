@@ -3,116 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Çalışan YouTube MP3 İndirici</title>
+    <title>PDF'ten Online & Word Test Oluşturucu</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
+<body class="bg-gray-50 text-gray-800 min-h-screen p-4 md:p-8">
 
-    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md p-4">
-        <div class="max-w-5xl mx-auto flex justify-between items-center">
-            <span class="text-xl font-bold bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent">ListToMP3 (Canlı Sürüm)</span>
-            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded">API Aktif</span>
+    <div class="max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-blue-600 mb-6">📄 PDF'ten Online & Word Test Oluşturucu</h1>
+        
+        <div class="space-y-4 mb-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">1. Gemini API Anahtarınız:</label>
+                <input type="password" id="apiKey" placeholder="AIzaSy..." class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <p class="text-xs text-gray-500 mt-1">Anahtarınız güvenlidir, hiçbir sunucuya kaydedilmez. Sadece tarayıcınızda çalışır.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">2. PDF Dosyası Seçin:</label>
+                <input type="file" id="pdfFile" accept=".pdf" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            </div>
+
+            <button id="generateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition hidden">
+                🔄 Test Oluştur (5 Şıklı)
+            </button>
         </div>
-    </header>
 
-    <main class="max-w-3xl w-full mx-auto px-4 py-12 flex-grow flex flex-col justify-center">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-extrabold mb-2">YouTube Video/Çalma Listesi MP3 İndir</h1>
-            <p class="text-slate-400">Aşağıya YouTube video veya çalma listesindeki bir video linkini yapıştırın.</p>
+        <div id="loading" class="hidden text-center py-4">
+            <div class="animate-spin inline-block w-8 h-8 border-[3px] border-current border-t-transparent text-blue-600 rounded-full mb-2"></div>
+            <p class="text-sm text-gray-600">Yapay zeka soruları hazırlıyor, lütfen bekleyin...</p>
         </div>
 
-        <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl shadow-xl mb-8">
-            <div class="flex flex-col sm:flex-row gap-3">
-                <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=... veya çalma listesi linki" 
-                       class="flex-grow bg-slate-900 border border-slate-700 rounded-xl py-3 px-4 text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
-                <button onclick="startDownload()" id="actionBtn" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-6 py-3 rounded-xl transition active:scale-95 cursor-pointer">
-                    MP3 Dönüştür ve İndir
+        <hr class="border-gray-200 my-6">
+
+        <div id="testArea" class="hidden space-y-6">
+            <h2 class="text-xl font-bold text-gray-900 border-b pb-2">📝 Online Test Alanı</h2>
+            <div id="questionsContainer" class="space-y-6"></div>
+            
+            <button id="submitBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition">
+                ✔️ Testi Bitir ve Sonuçları Gör
+            </button>
+            
+            <div id="resultBox" class="hidden p-4 rounded-lg text-center font-bold text-lg"></div>
+
+            <hr class="border-gray-200 my-6">
+
+            <div>
+                <h2 class="text-xl font-bold text-gray-900 mb-3">💾 Cihaza Kaydet</h2>
+                <button id="downloadWordBtn" class="w-full bg-w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 rounded-lg transition">
+                    📥 Testi Word (DOCX) Olarak İndir
                 </button>
             </div>
-            <p id="infoMessage" class="text-slate-400 text-xs mt-3 text-center hidden"></p>
         </div>
-
-        <div id="statusPanel" class="bg-slate-800/30 border border-slate-700/40 rounded-2xl p-6 hidden">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-sm text-slate-300">İşlem Durumu</h3>
-                <span id="statusBadge" class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded animate-pulse">Hazırlanıyor</span>
-            </div>
-            <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden mb-2">
-                <div id="progressBar" class="bg-red-500 h-full w-0 transition-all duration-500"></div>
-            </div>
-            <p id="trackTitle" class="text-sm font-medium text-slate-200 truncate mt-2">Video yükleniyor...</p>
-        </div>
-    </main>
-
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        <p>&copy; 2026 ListToMP3 | Powered by ÖZGÜR DAĞ</p>
-    </footer>
+    </div>
 
     <script>
-        async function startDownload() {
-            const urlInput = document.getElementById('youtubeUrl').value.trim();
-            const actionBtn = document.getElementById('actionBtn');
-            const statusPanel = document.getElementById('statusPanel');
-            const statusBadge = document.getElementById('statusBadge');
-            const progressBar = document.getElementById('progressBar');
-            const trackTitle = document.getElementById('trackTitle');
-            const infoMessage = document.getElementById('infoMessage');
+        // PDF.js worker ayarı
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-            if (!urlInput) {
-                alert("Lütfen geçerli bir YouTube linki girin!");
+        let extractedText = "";
+        let currentQuestions = [];
+
+        // 1. PDF'ten Metin Okuma
+        document.getElementById('pdfFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            extractedText = "";
+            const fileReader = new FileReader();
+            
+            fileReader.onload = async function() {
+                const typedarray = new Uint8Array(this.result);
+                const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                
+                // İlk 3 sayfayı veya tüm sayfaları oku (API limitleri için sınırlandırılabilir)
+                const maxPages = Math.min(pdf.numPages, 5); 
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    extractedText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+                
+                if(extractedText.trim().length > 0) {
+                    document.getElementById('generateBtn').classList.remove('hidden');
+                    alert("PDF başarıyla okundu! Artık test oluşturabilirsiniz.");
+                } else {
+                    alert("PDF'ten metin çıkarılamadı. Lütfen taranmamış, dijital bir PDF deneyin.");
+                }
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+
+        // 2. Gemini API ile Test Üretme
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert("Lütfen önce Gemini API anahtarınızı girin!");
                 return;
             }
 
-            // Temel video ID ayrıştırma (Regex)
-            let videoId = "";
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-            const match = urlInput.match(regExp);
-            
-            if (match && match[2].length == 11) {
-                videoId = match[2];
-            } else {
-                alert("Mevcut API kısıtlamaları nedeniyle lütfen çalma listesindeki videolardan birinin doğrudan linkini veya tekil video linkini tarayıcıdan kopyalayarak girin.");
-                return;
-            }
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('testArea').classList.add('hidden');
+            document.getElementById('resultBox').classList.add('hidden');
 
-            // UI Güncelleme
-            actionBtn.disabled = true;
-            actionBtn.innerText = "İşleniyor...";
-            statusPanel.classList.remove('hidden');
-            progressBar.style.width = "20%";
-            statusBadge.innerText = "Dönüştürülüyor";
-            trackTitle.innerText = `Video ID: ${videoId} için sunucu tetikleniyor...`;
+            const prompt = `Aşağıdaki metne dayanarak 5 şıklı (A, B, C, D, E) çoktan seçmeli 5 adet benzersiz test sorusu hazırla.
+Çıktıyı kesinlikle sadece ve sadece aşağıdaki JSON formatında ver, başka hiçbir açıklama yazma:
+[
+  {
+    "soru": "Soru metni buraya",
+    "siklar": {"A": "Şık 1", "B": "Şık 2", "C": "Şık 3", "D": "Şık 4", "E": "Şık 5"},
+    "cevap": "Doğru Şık (Sadece A, B, C, D veya E)"
+  }
+]
 
-            // Tamamen ücretsiz ve tarayıcıdan doğrudan çalışan bir toplu dönüştürme API'si (RapidAPI veya üçüncü taraf gateway kullanır)
-            // Bu örnekte kararlı çalışan "yieldkit/mp3Juices" türevi açık bir endpoint simüle edilerek yönlendirilir.
-            const apiEndpoint = `https://api.vexd.net/v1/download?id=${videoId}&format=mp3`; 
-            // Alternatif açık geçit: https://api.shiftex.me/api/download?url=...
-            
+Metin: ${extractedText.substring(0, 4000)}`;
+
             try {
-                progressBar.style.width = "60%";
-                
-                // Gerçek indirme penceresini harici güvenli dönüştürücü ağ geçidine yönlendiriyoruz
-                // Bu yöntem tarayıcı tabanlı CORS takılmalarını aşmanın en kararlı yoludur.
-                const downloadUrl = `https://loader.to/api/card/?url=https://www.youtube.com/watch?v=${videoId}&f=mp3`;
-                
-                trackTitle.innerHTML = `<span class="text-emerald-400">Dönüşüm Penceresi Hazır!</span> Aşağıdaki bağlantıdan doğrudan indirmeyi başlatabilirsiniz.`;
-                statusBadge.innerText = "Hazır";
-                statusBadge.className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded";
-                progressBar.style.width = "100%";
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
 
-                infoMessage.classList.remove('hidden');
-                infoMessage.innerHTML = `<a href="${downloadUrl}" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg inline-block font-semibold mt-2 animate-bounce"><i class="fa-solid fa-file-audio"></i> Buraya Tıklayarak MP3 Dosyasını İndir</a>`;
+                const data = await response.json();
+                let rawText = data.candidates[0].content.parts[0].text.dynamic || data.candidates[0].content.parts[0].text;
+                
+                // Markdown ```json temizliği
+                rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                currentQuestions = JSON.parse(rawText);
 
+                renderTest(currentQuestions);
             } catch (error) {
-                statusBadge.innerText = "Hata Oluştu";
-                statusBadge.className = "text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded";
-                trackTitle.innerText = "API sunucusuna bağlanılamadı. Lütfen daha sonra tekrar deneyin.";
+                console.error(error);
+                alert("Test oluşturulurken bir hata oluştu. API anahtarınızı kontrol edin veya tekrar deneyin.");
             } finally {
-                actionBtn.disabled = false;
-                actionBtn.innerText = "MP3 Dönüştür ve İndir";
+                document.getElementById('loading').classList.add('hidden');
             }
+        });
+
+        // 3. Soruları Ekrana Basma (Online Test)
+        function renderTest(questions) {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = "";
+
+            questions.forEach((q, qIdx) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = "p-4 border border-gray-200 rounded-xl space-y-2 bg-gray-50";
+                
+                const qTitle = document.createElement('h3');
+                qTitle.className = "font-semibold text-gray-900";
+                qTitle.innerText = `${qIdx + 1}. ${q.soru}`;
+                qDiv.appendChild(qTitle);
+
+                // Şıklar
+                Object.entries(q.siklar).forEach(([key, val]) => {
+                    const label = document.createElement('label');
+                    label.className = "flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-200 cursor-pointer text-sm text-gray-700";
+                    
+                    const radio = document.createElement('input');
+                    radio.type = "radio";
+                    radio.name = `question_${qIdx}`;
+                    radio.value = key;
+                    radio.className = "h-4 w-4 text-blue-600 focus:ring-blue-500";
+                    
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(` ${key}) ${val}`));
+                    qDiv.appendChild(label);
+                });
+
+                container.appendChild(qDiv);
+            });
+
+            document.getElementById('testArea').classList.remove('hidden');
         }
+
+        // 4. Testi Bitir ve Değerlendir
+        document.getElementById('submitBtn').addEventListener('click', () => {
+            let correctCount = 0;
+            const container = document.getElementById('questionsContainer');
+            
+            currentQuestions.forEach((q, qIdx) => {
+                const selected = document.querySelector(`input[name="question_${qIdx}"]:checked`);
+                const qDiv = container.children[qIdx];
+                
+                // Eski renklendirmeleri temizle
+                qDiv.classList.remove('border-green-500', 'bg-green-50', 'border-red-500', 'bg-red-50');
+
+                if (selected && selected.value === q.cevap) {
+                    correctCount++;
+                    qDiv.classList.add('border-green-500', 'bg-green-50/50');
+                } else {
+                    qDiv.classList.add('border-red-500', 'bg-red-50/50');
+                }
+            });
+
+            const resultBox = document.getElementById('resultBox');
+            resultBox.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-yellow-100', 'text-yellow-800');
+            
+            resultBox.innerText = `Toplam Başarı: ${correctCount} / ${currentQuestions.length}`;
+            if(correctCount === currentQuestions.length) {
+                resultBox.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                resultBox.classList.add('bg-yellow-100', 'text-yellow-800');
+            }
+            resultBox.scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // 5. Word (DOCX) Dosyası Olarak Kaydetme
+        document.getElementById('downloadWordBtn').addEventListener('click', () => {
+            if (currentQuestions.length === 0) return;
+
+            const docParagraphs = [
+                new docx.Paragraph({
+                    text: "PDF Kaynaklı Çoktan Seçmeli Test",
+                    heading: docx.HeadingLevel.HEADING_1,
+                    spacing: { after: 300 }
+                })
+            ];
+
+            // Soruları ekle
+            currentQuestions.forEach((q, idx) => {
+                docParagraphs.push(new docx.Paragraph({
+                    text: `${idx + 1}) ${q.soru}`,
+                    bold: true,
+                    spacing: { before: 200, after: 100 }
+                }));
+
+                Object.entries(q.siklar).forEach(([key, val]) => {
+                    docParagraphs.push(new docx.Paragraph({
+                        text: `${key}) ${val}`,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }));
+                });
+            });
+
+            // Sayfa Sonu ve Cevap Anahtarı
+            docParagraphs.push(new docx.Paragraph({ text: "", pageBreakBefore: true }));
+            docParagraphs.push(new docx.Paragraph({
+                text: "Cevap Anahtarı",
+                heading: docx.HeadingLevel.HEADING_2,
+                spacing: { after: 200 }
+            }));
+
+            const cevaplarText = currentQuestions.map((q, idx) => `Soru ${idx + 1}: ${q.cevap}`).join(", ");
+            docParagraphs.push(new docx.Paragraph({ text: cevaplarText }));
+
+            const doc = new docx.Document({
+                sections: [{ properties: {}, children: docParagraphs }]
+            });
+
+            docx.Packer.toBlob(doc).then(blob => {
+                saveAs(blob, "pdf_test_sorulari.docx");
+            });
+        });
     </script>
 </body>
 </html>
